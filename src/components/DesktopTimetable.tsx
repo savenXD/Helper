@@ -39,7 +39,7 @@ export const DesktopTimetable: React.FC<DesktopTimetableProps> = ({
     <div className="w-full overflow-x-auto pb-4">
       <div className="min-w-[1080px] bg-white dark:bg-black border-2 border-black dark:border-white rounded-xl shadow-xl overflow-hidden timetable-grid transition-colors">
         
-        <table className="w-full border-collapse text-center select-none">
+        <table className="w-full border-collapse text-center">
           <thead>
             {/* Main Header Row 1: Periods & Lunch */}
             <tr className="border-b-2 border-black dark:border-white bg-black dark:bg-white text-white dark:text-black">

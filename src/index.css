@@ -5,6 +5,22 @@
     -webkit-tap-highlight-color: transparent;
   }
 
+  /* Custom modern text selection color */
+  ::selection {
+    background-color: rgba(99, 102, 241, 0.45);
+    color: #ffffff;
+  }
+  ::-moz-selection {
+    background-color: rgba(99, 102, 241, 0.45);
+    color: #ffffff;
+  }
+
+  /* Prevent text highlighting on interactive buttons and icons */
+  button, svg {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
   :root {
     --font-nunito: 'Nunito', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   }
@@ -89,14 +105,13 @@
     0 4px 24px rgba(0, 0, 0, 0.6),
     0 1px 0 rgba(255, 255, 255, 0.08) inset,
     0 0 0 1px rgba(255, 255, 255, 0.04) inset;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .glass-card:active {
   box-shadow:
     0 2px 10px rgba(0, 0, 0, 0.5),
     0 1px 0 rgba(255, 255, 255, 0.06) inset;
-  transform: scale(0.98);
 }
 
 /* Active / highlighted glass card */
@@ -128,6 +143,15 @@
 }
 .animate-slide-up {
   animation: slideUp 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Slide down animation for top-right toasts */
+@keyframes slideDown {
+  0%   { opacity: 0; transform: translateY(-16px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.animate-slide-down {
+  animation: slideDown 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
 /* Lenis smooth scrolling rules */

@@ -25,7 +25,11 @@ import {
   PlusSquare,
   Compass,
   MoreVertical,
-  Smartphone
+  Smartphone,
+  Copy,
+  Check,
+  LayoutGrid,
+  Layers
 } from 'lucide-react';
 
 interface ScheduleSlot {
@@ -82,6 +86,100 @@ export function App() {
   const [showInstallGuide, setShowInstallGuide] = useState<boolean>(false);
   const [isIOSDevice, setIsIOSDevice] = useState<boolean>(false);
   const [installGuideOS, setInstallGuideOS] = useState<'ios' | 'android'>('android');
+
+  // Toast notification & Copied Unit states
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [copiedUnitNumber, setCopiedUnitNumber] = useState<number | null>(null);
+
+  // Multi View states (Laptop / Desktop only)
+  const [showMultiViewModal, setShowMultiViewModal] = useState<boolean>(false);
+  const [isMultiViewActive, setIsMultiViewActive] = useState<boolean>(false);
+  const [selectedMultiSubjectIds, setSelectedMultiSubjectIds] = useState<string[]>([]);
+
+  const handleOpenMultiViewModal = () => {
+    if (selectedMultiSubjectIds.length === 0 && syllabusSubjects.length >= 2) {
+      setSelectedMultiSubjectIds([syllabusSubjects[0].id, syllabusSubjects[1].id]);
+    }
+    setShowMultiViewModal(true);
+  };
+
+  const toggleMultiSubjectSelect = (subId: string) => {
+    setSelectedMultiSubjectIds((prev) =>
+      prev.includes(subId) ? prev.filter((id) => id !== subId) : [...prev, subId]
+    );
+  };
+
+  const selectAllMultiSubjects = () => {
+    setSelectedMultiSubjectIds(syllabusSubjects.map((s) => s.id));
+  };
+
+  const clearAllMultiSubjects = () => {
+    setSelectedMultiSubjectIds([]);
+  };
+
+  const handleApplyMultiView = () => {
+    if (selectedMultiSubjectIds.length > 0) {
+      setIsMultiViewActive(true);
+      setShowMultiViewModal(false);
+    }
+  };
+
+  const removeMultiSubject = (subId: string) => {
+    const updated = selectedMultiSubjectIds.filter((id) => id !== subId);
+    setSelectedMultiSubjectIds(updated);
+    if (updated.length === 0) {
+      setIsMultiViewActive(false);
+    }
+  };
+
+  const handleCopyUnit = (unitNumber: number, title: string, paragraphs: any[]) => {
+    let content = `Unit ${unitNumber} — ${title}\n\n`;
+    paragraphs.forEach((p) => {
+      let line = '';
+      if (p.boldPrefix) line += p.boldPrefix;
+      if (p.text) line += p.text;
+      if (p.boldInline) line += p.boldInline;
+      if (p.textSuffix) line += p.textSuffix;
+      content += line + '\n';
+    });
+
+    const cleanText = content.trim();
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cleanText).catch(() => {
+        fallbackCopyText(cleanText);
+      });
+    } else {
+      fallbackCopyText(cleanText);
+    }
+
+    setCopiedUnitNumber(unitNumber);
+    setToastMessage(`Copied Unit ${unitNumber} syllabus!`);
+
+    setTimeout(() => {
+      setCopiedUnitNumber(null);
+    }, 2000);
+
+    setTimeout(() => {
+      setToastMessage(null);
+    }, 3000);
+  };
+
+  const fallbackCopyText = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.opacity = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+    }
+    document.body.removeChild(textArea);
+  };
 
   // Ensure dark mode is strictly active
   useEffect(() => {
@@ -972,7 +1070,20 @@ export function App() {
   const selectedSubject = syllabusSubjects.find((sub) => sub.id === selectedSubjectId);
 
   return (
-    <div className="mesh-bg page-bg text-white font-sans select-none min-h-screen w-full relative flex flex-col justify-center">
+    <div className="mesh-bg page-bg text-white font-sans min-h-screen w-full relative flex flex-col justify-center">
+
+      {/* Top Right Toast Notification Bar */}
+      {toastMessage && createPortal(
+        <div className="fixed top-4 right-4 sm:top-6 sm:right-6 z-[10000] animate-slide-down flex items-center gap-3 px-4 py-3 rounded-2xl bg-neutral-900/95 backdrop-blur-xl border border-neutral-700/80 text-white shadow-2xl shadow-black/90 pointer-events-auto">
+          <div className="p-1.5 rounded-xl bg-white text-black shrink-0 shadow-sm">
+            <Check className="w-4 h-4 stroke-[2.5]" />
+          </div>
+          <span className="text-xs sm:text-sm font-bold text-white pr-1">
+            {toastMessage}
+          </span>
+        </div>,
+        document.body
+      )}
 
       {/* PWA Custom Bottom Install Banner */}
       {showInstallBanner && createPortal(
@@ -1169,6 +1280,108 @@ export function App() {
         document.body
       )}
 
+      {/* Multi View Selection Modal (Laptop / Desktop) */}
+      {showMultiViewModal && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-700/80 rounded-2xl max-w-xl w-full p-5 sm:p-6 space-y-5 text-white shadow-2xl relative animate-slide-up">
+            
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 pb-3 border-b border-neutral-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-white text-black shrink-0 shadow-sm">
+                  <LayoutGrid className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white leading-tight">
+                    Multi View Subject Selector
+                  </h3>
+                  <p className="text-xs text-neutral-400 font-medium mt-0.5">
+                    Select the subjects you want to view side-by-side in one frame.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMultiViewModal(false)}
+                className="p-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Actions (Select All / Clear) */}
+            <div className="flex items-center justify-between text-xs font-semibold text-neutral-400">
+              <span>{selectedMultiSubjectIds.length} of {syllabusSubjects.length} selected</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={selectAllMultiSubjects}
+                  className="hover:text-white underline cursor-pointer"
+                >
+                  Select All
+                </button>
+                <span>•</span>
+                <button
+                  onClick={clearAllMultiSubjects}
+                  className="hover:text-white underline cursor-pointer"
+                >
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            {/* Subject Selection Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[50vh] overflow-y-auto pr-1">
+              {syllabusSubjects.map((sub) => {
+                const isSelected = selectedMultiSubjectIds.includes(sub.id);
+                const Icon = sub.icon;
+                return (
+                  <div
+                    key={sub.id}
+                    onClick={() => toggleMultiSubjectSelect(sub.id)}
+                    className={`p-3 rounded-xl border flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                      isSelected
+                        ? 'bg-neutral-800 border-white text-white shadow-md'
+                        : 'bg-neutral-950/60 border-neutral-800 text-neutral-400 hover:border-neutral-700 hover:text-neutral-200'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`p-1.5 rounded-lg shrink-0 ${isSelected ? 'bg-white text-black' : 'bg-neutral-900 text-neutral-300 border border-neutral-800'}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-extrabold truncate">{sub.name}</p>
+                        <span className="text-[10px] font-mono text-neutral-400">{sub.code}</span>
+                      </div>
+                    </div>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${isSelected ? 'bg-white border-white text-black' : 'border-neutral-700 bg-neutral-900'}`}>
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Modal Footer Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-neutral-800">
+              <button
+                onClick={() => setShowMultiViewModal(false)}
+                className="px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-neutral-300 hover:text-white transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleApplyMultiView}
+                disabled={selectedMultiSubjectIds.length === 0}
+                className="px-5 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:pointer-events-none text-black text-xs font-extrabold transition cursor-pointer shadow-md"
+              >
+                OK (View {selectedMultiSubjectIds.length} {selectedMultiSubjectIds.length === 1 ? 'Subject' : 'Subjects'})
+              </button>
+            </div>
+
+          </div>
+        </div>,
+        document.body
+      )}
+
       {view === 'subject-detail' && selectedSubject ? (
         /* ========================================================================= */
         /* SUBJECT DETAIL PAGE (Active when view === 'subject-detail')              */
@@ -1206,7 +1419,7 @@ export function App() {
           </header>
 
           {/* Subject Header - Deep Black Container */}
-          <div className="flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-black border border-neutral-800 shadow-2xl outline-none ring-0 focus:outline-none select-none">
+          <div className="flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-black border border-neutral-800 shadow-2xl outline-none ring-0 focus:outline-none">
             <div className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 shadow-inner shrink-0 flex items-center justify-center">
               {React.createElement(selectedSubject.icon, { className: "w-6 h-6 text-white stroke-[2]" })}
             </div>
@@ -1223,39 +1436,63 @@ export function App() {
           {/* Units Syllabus List */}
           <div className="space-y-4 flex-1">
             {selectedSubject.units && selectedSubject.units.length > 0 ? (
-              selectedSubject.units.map((unit) => (
-                <div
-                  key={unit.unitNumber}
-                  className="p-4 sm:p-6 rounded-2xl glass-card space-y-3 transition-all"
-                >
-                  {/* Unit Title Header Row */}
-                  <div className="pb-2.5 border-b border-neutral-800/80">
-                    <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
-                      Unit {unit.unitNumber} &nbsp;—&nbsp; {unit.title}
-                    </h2>
-                  </div>
+              selectedSubject.units.map((unit) => {
+                const isUnitCopied = copiedUnitNumber === unit.unitNumber;
+                return (
+                  <div
+                    key={unit.unitNumber}
+                    className="p-4 sm:p-6 rounded-2xl glass-card space-y-3 transition-all relative group"
+                  >
+                    {/* Unit Title Header Row */}
+                    <div className="pb-2.5 border-b border-neutral-800/80 flex items-center justify-between gap-3">
+                      <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                        Unit {unit.unitNumber} &nbsp;—&nbsp; {unit.title}
+                      </h2>
+                      <button
+                        onClick={() => handleCopyUnit(unit.unitNumber, unit.title, unit.paragraphs)}
+                        className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all active:scale-95 ${
+                          isUnitCopied
+                            ? 'bg-white border-white text-black font-extrabold shadow-md'
+                            : 'bg-neutral-900/90 border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800/90 hover:border-neutral-700'
+                        }`}
+                        title="Copy Unit Syllabus"
+                      >
+                        {isUnitCopied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-neutral-400 group-hover:text-white stroke-[2]" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
 
-                  {/* Unit Paragraph Content */}
-                  <div className="space-y-3 pt-1.5 text-sm sm:text-base text-neutral-300 leading-relaxed font-normal">
-                    {unit.paragraphs.map((para, pIdx) => (
-                      <p key={pIdx}>
-                        {para.boldPrefix && (
-                          <strong className="font-extrabold text-white">
-                            {para.boldPrefix}
-                          </strong>
-                        )}
-                        <span>{para.text}</span>
-                        {para.boldInline && (
-                          <strong className="font-extrabold text-white">
-                            {para.boldInline}
-                          </strong>
-                        )}
-                        {para.textSuffix && <span>{para.textSuffix}</span>}
-                      </p>
-                    ))}
+                    {/* Unit Paragraph Content */}
+                    <div className="space-y-3 pt-1.5 text-sm sm:text-base text-neutral-300 leading-relaxed font-normal">
+                      {unit.paragraphs.map((para, pIdx) => (
+                        <p key={pIdx}>
+                          {para.boldPrefix && (
+                            <strong className="font-extrabold text-white">
+                              {para.boldPrefix}
+                            </strong>
+                          )}
+                          <span>{para.text}</span>
+                          {para.boldInline && (
+                            <strong className="font-extrabold text-white">
+                              {para.boldInline}
+                            </strong>
+                          )}
+                          {para.textSuffix && <span>{para.textSuffix}</span>}
+                        </p>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="p-8 rounded-2xl glass-card-muted text-center text-neutral-500 font-medium">
                 Syllabus content for {selectedSubject.name} will be added soon...
@@ -1276,7 +1513,158 @@ export function App() {
             <div style={{ position: 'absolute', top: '50%', right: '8%', width: '150px', height: '150px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(16,185,129,0.055) 0%, transparent 70%)', filter: 'blur(20px)' }} />
             <div style={{ position: 'absolute', bottom: '18%', left: '6%', width: '170px', height: '170px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%)', filter: 'blur(24px)' }} />
           </div>
-        <div className="relative z-10 max-w-4xl mx-auto p-4 sm:p-6 flex flex-col space-y-6">
+        {isMultiViewActive ? (
+          /* ========================================================================= */
+          /* MULTI VIEW FRAME LAYOUT (Side-by-Side Subjects Frame for Laptop/Desktop) */
+          /* ========================================================================= */
+          <div className="relative z-10 w-full max-w-[1700px] mx-auto p-4 sm:p-6 flex flex-col space-y-6">
+            
+            {/* Multi View Top Bar Header */}
+            <header className="flex items-center justify-between pb-4 border-b border-neutral-800 shrink-0 gap-3">
+              <button
+                onClick={() => setIsMultiViewActive(false)}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-neutral-800 bg-neutral-900 hover:bg-neutral-800 text-xs sm:text-sm font-bold text-white transition-all cursor-pointer shadow-md"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Single View</span>
+              </button>
+
+              <div className="flex items-center gap-2 text-center">
+                <LayoutGrid className="w-5 h-5 text-white shrink-0 hidden sm:block" />
+                <h1 className="text-base sm:text-lg font-black text-white tracking-tight uppercase">
+                  Multi View ({selectedMultiSubjectIds.length} Subjects)
+                </h1>
+              </div>
+
+              <button
+                onClick={handleOpenMultiViewModal}
+                className="flex items-center gap-2 px-3.5 py-2 rounded-xl border border-neutral-700 bg-neutral-900 hover:bg-neutral-800 text-xs sm:text-sm font-bold text-white transition-all cursor-pointer shadow-md"
+              >
+                <Layers className="w-4 h-4 text-white" />
+                <span className="hidden sm:inline">Change Selection</span>
+                <span className="sm:hidden">Edit</span>
+              </button>
+            </header>
+
+            {/* Multi View Columns Frame Grid */}
+            <div className={`grid gap-5 items-start ${
+              selectedMultiSubjectIds.length === 1
+                ? 'grid-cols-1 max-w-4xl mx-auto'
+                : selectedMultiSubjectIds.length === 2
+                ? 'grid-cols-1 md:grid-cols-2'
+                : selectedMultiSubjectIds.length === 3
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+            }`}>
+              {selectedMultiSubjectIds.map((subId) => {
+                const sub = syllabusSubjects.find((s) => s.id === subId);
+                if (!sub) return null;
+                const Icon = sub.icon;
+
+                return (
+                  <div
+                    key={sub.id}
+                    className="glass-card rounded-2xl p-4 sm:p-5 flex flex-col space-y-4 border border-neutral-800/80 shadow-2xl relative"
+                  >
+                    {/* Subject Column Header */}
+                    <div className="pb-3 border-b border-neutral-800/80 flex items-center justify-between gap-3 bg-black/60 p-3 rounded-xl border border-neutral-800">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 rounded-lg bg-neutral-900 border border-neutral-800 shrink-0 text-white">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <h2 className="text-sm font-black text-white leading-tight truncate">
+                            {sub.name}
+                          </h2>
+                          <span className="text-[10px] font-mono font-bold text-neutral-400 block">
+                            {sub.code}
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeMultiSubject(sub.id)}
+                        className="p-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white transition cursor-pointer"
+                        title="Remove from view"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Column Units Syllabus List */}
+                    <div className="space-y-3.5 flex-1 max-h-[75vh] overflow-y-auto pr-1">
+                      {sub.units && sub.units.length > 0 ? (
+                        sub.units.map((unit) => {
+                          const isUnitCopied = copiedUnitNumber === unit.unitNumber;
+                          return (
+                            <div
+                              key={unit.unitNumber}
+                              className="p-3.5 sm:p-4 rounded-xl bg-neutral-950/70 border border-neutral-800 space-y-2.5"
+                            >
+                              {/* Unit Header Row */}
+                              <div className="pb-2 border-b border-neutral-800/60 flex items-center justify-between gap-2">
+                                <h3 className="text-xs sm:text-sm font-extrabold text-white tracking-tight">
+                                  Unit {unit.unitNumber} — {unit.title}
+                                </h3>
+                                <button
+                                  onClick={() => handleCopyUnit(unit.unitNumber, unit.title, unit.paragraphs)}
+                                  className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all active:scale-95 cursor-pointer ${
+                                    isUnitCopied
+                                      ? 'bg-white border-white text-black font-extrabold shadow-sm'
+                                      : 'bg-neutral-900 border-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-800'
+                                  }`}
+                                  title="Copy Unit"
+                                >
+                                  {isUnitCopied ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-black stroke-[2.5]" />
+                                      <span>Copied</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-3 h-3 text-neutral-400 stroke-[2]" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+
+                              {/* Unit Content */}
+                              <div className="space-y-2 text-xs text-neutral-300 leading-relaxed font-normal">
+                                {unit.paragraphs.map((para, pIdx) => (
+                                  <p key={pIdx}>
+                                    {para.boldPrefix && (
+                                      <strong className="font-bold text-white">
+                                        {para.boldPrefix}
+                                      </strong>
+                                    )}
+                                    <span>{para.text}</span>
+                                    {para.boldInline && (
+                                      <strong className="font-bold text-white">
+                                        {para.boldInline}
+                                      </strong>
+                                    )}
+                                    {para.textSuffix && <span>{para.textSuffix}</span>}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 rounded-xl bg-neutral-900/50 text-center text-neutral-500 text-xs font-medium">
+                          No unit data available.
+                        </div>
+                      )}
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+
+          </div>
+        ) : (
+          <div className="relative z-10 max-w-4xl mx-auto p-4 sm:p-6 flex flex-col space-y-6">
           
           {/* Syllabus Navbar Header */}
           <header className="flex items-center justify-between pb-3 border-b border-neutral-800 shrink-0">
@@ -1286,6 +1674,16 @@ export function App() {
             >
               <ArrowLeft className="w-4 h-4" />
               <span>Timetable</span>
+            </button>
+
+            {/* Laptop-only Multi View Button */}
+            <button
+              onClick={handleOpenMultiViewModal}
+              className="hidden md:flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-neutral-700/80 bg-neutral-900/90 hover:bg-neutral-800 active:scale-95 text-xs sm:text-sm font-bold text-white transition-all cursor-pointer shadow-md"
+              title="View multiple subjects side-by-side"
+            >
+              <LayoutGrid className="w-4 h-4 text-white stroke-[2]" />
+              <span>Multi View</span>
             </button>
           </header>
 
@@ -1389,7 +1787,8 @@ export function App() {
             </a>
           </div>
 
-        </div>
+          </div>
+        )}
         </div>
       ) : (
         /* ========================================================================= */
@@ -1496,7 +1895,7 @@ export function App() {
                       {dayIdx === 0 && (
                         <td
                           rowSpan={5}
-                          className="border-r border-neutral-800 bg-neutral-900/40 text-neutral-300 font-black text-xs sm:text-sm align-middle select-none"
+                          className="border-r border-neutral-800 bg-neutral-900/40 text-neutral-300 font-black text-xs sm:text-sm align-middle"
                         >
                           <div className="flex flex-col items-center justify-center space-y-2.5 font-black tracking-[0.25em] text-neutral-300">
                             <span>L</span>
